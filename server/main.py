@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List
@@ -35,6 +35,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    try:
+        # Test database connection
+        await db.fetch_one("SELECT 1")
+        return JSONResponse({"status": "healthy", "database": "connected"})
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": str(e)}
+        )
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

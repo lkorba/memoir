@@ -2,17 +2,20 @@ version: '3.8'
 
 services:
   web:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - ENV=${ENV}
+      - DATABASE_URL=postgresql://n159:A755_998d91@psql01.mikr.us:5432/db_n159
+      - ENV=development
       - PORT=8000
     volumes:
       - ./static:/app/static
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
