@@ -1,18 +1,15 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import List
-import os
 
-from .database import Database
+from .database import db
 from .models import Entry, EntryCreate, EntryUpdate
-from .config import Settings, get_settings
+from .config import get_settings
 
 settings = get_settings()
-db = Database()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,8 +37,7 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     try:
-        # Test database connection
-        await db.fetch_one("SELECT 1")
+        await db.fetch_one("SELECT 1 as value")
         return JSONResponse({"status": "healthy", "database": "connected"})
     except Exception as e:
         return JSONResponse(
@@ -59,7 +55,7 @@ async def get_entries():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/entries", response_model=Entry, status_code=status.HTTP_201_CREATED)
+@app.post("/api/entries", response_model=Entry)
 async def create_entry(entry: EntryCreate):
     try:
         query = """

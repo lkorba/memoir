@@ -68,3 +68,6 @@ class Database:
             await self._pool.close()
             self._pool = None
             print("Database connection closed")
+
+# Create a single instance
+db = Database()

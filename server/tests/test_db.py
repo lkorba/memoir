@@ -1,59 +1,60 @@
 import pytest
-from ..database import Database
-from ..config import get_settings
+import asyncio
+from ..database import db
 
-@pytest.fixture
-def db():
-    database = Database()
-    database.init_db()
-    yield database
+@pytest.fixture(autouse=True)
+async def setup_database():
+    await db.connect()
+    await db.init_db()
+    yield db
     # Cleanup
-    with database.conn.cursor() as cur:
-        cur.execute("DELETE FROM entries WHERE title LIKE 'Test Entry%'")
-        database.conn.commit()
-    database.close()
+    async with db._pool.acquire() as conn:
+        await conn.execute("DELETE FROM entries WHERE title LIKE 'Test Entry%'")
+    await db.close()
 
-def test_database_connection(db):
-    with db.conn.cursor() as cur:
-        cur.execute("SELECT 1")
-        result = cur.fetchone()
-        assert result is not None
+@pytest.mark.asyncio
+async def test_database_connection():
+    result = await db.fetch_one("SELECT 1 as value")
+    assert result["value"] == 1
 
-def test_create_entry(db):
+@pytest.mark.asyncio
+async def test_create_entry():
     title = "Test Entry 1"
     content = "Test Content 1"
     
-    result = db.query(
-        "INSERT INTO entries (title, content) VALUES (%s, %s) RETURNING *",
-        (title, content)
+    result = await db.fetch_one(
+        "INSERT INTO entries (title, content) VALUES ($1, $2) RETURNING *",
+        title, content
     )
     
-    assert result[0]["title"] == title
-    assert result[0]["content"] == content
+    assert result["title"] == title
+    assert result["content"] == content
 
-def test_retrieve_entry(db):
+@pytest.mark.asyncio
+async def test_retrieve_entry():
     # Create test entry
     title = "Test Entry 2"
     content = "Test Content 2"
     
-    created = db.query(
-        "INSERT INTO entries (title, content) VALUES (%s, %s) RETURNING *",
-        (title, content)
-    )[0]
-    
-    # Retrieve the entry
-    result = db.query(
-        "SELECT * FROM entries WHERE id = %s",
-        (created["id"],)
+    created = await db.fetch_one(
+        "INSERT INTO entries (title, content) VALUES ($1, $2) RETURNING *",
+        title, content
     )
     
-    assert result[0]["id"] == created["id"]
-    assert result[0]["title"] == title
-    assert result[0]["content"] == content
+    # Retrieve the entry
+    result = await db.fetch_one(
+        "SELECT * FROM entries WHERE id = $1",
+        created["id"]
+    )
+    
+    assert result["id"] == created["id"]
+    assert result["title"] == title
+    assert result["content"] == content
 
-def test_error_handling(db):
+@pytest.mark.asyncio
+async def test_error_handling():
     with pytest.raises(Exception):
-        db.query("INSERT INTO entries (title) VALUES (%s)", ["Test Entry"])
+        await db.execute("INSERT INTO entries (title) VALUES ($1)", "Test Entry")
     
     with pytest.raises(Exception):
-        db.query("SELECT invalid_column FROM entries")
+        await db.fetch_all("SELECT invalid_column FROM entries")
